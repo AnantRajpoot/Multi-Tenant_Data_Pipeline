@@ -1,0 +1,5 @@
+{"id": "1", "first_name": "John", "last_name": "Doe", "status": "active", "score": 75}
+{"id": "2", "first_name": "Jane", "last_name": "Smith", "status": "inactive", "score": 65}
+{"id": "3", "first_name": "Bob", "last_name": "Johnson", "status": "active", "score": 55}
+{"id": "4", "first_name": "Alice", "last_name": "Williams", "status": "active", "score": 45}
+

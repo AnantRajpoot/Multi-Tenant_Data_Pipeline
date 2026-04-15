@@ -1,0 +1,38 @@
+[
+  {
+    "id": "1",
+    "region": "North",
+    "product": "Widget",
+    "amount": 100,
+    "price": 25.50
+  },
+  {
+    "id": "2",
+    "region": "North",
+    "product": "Widget",
+    "amount": 150,
+    "price": 25.50
+  },
+  {
+    "id": "3",
+    "region": "South",
+    "product": "Gadget",
+    "amount": 200,
+    "price": 45.00
+  },
+  {
+    "id": "4",
+    "region": "South",
+    "product": "Widget",
+    "amount": 75,
+    "price": 25.50
+  },
+  {
+    "id": "5",
+    "region": "North",
+    "product": "Gadget",
+    "amount": 300,
+    "price": 45.00
+  }
+]
+

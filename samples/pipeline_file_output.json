@@ -1,0 +1,34 @@
+{
+  "pipelineId": "pipeline_004",
+  "pipelineName": "CSV Export with Compression",
+  "tenantId": "tenant3",
+  "source": {
+    "type": "csv",
+    "config": {
+      "file_path": "test.csv",
+      "delimiter": ",",
+      "has_header": true,
+      "encoding": "UTF-8"
+    }
+  },
+  "transformations": [
+    {
+      "type": "map",
+      "config": {
+        "operations": {
+          "name_lower": "LOWER(name)",
+          "age_plus_ten": "ADD(age,10)"
+        }
+      }
+    }
+  ],
+  "destination": {
+    "type": "file",
+    "config": {
+      "file_path": "./output/transformed_data.json",
+      "format": "json",
+      "compress": true
+    }
+  }
+}
+

@@ -1,0 +1,37 @@
+{
+  "pipelineId": "pipeline_003",
+  "pipelineName": "JSONL to Database Pipeline",
+  "tenantId": "tenant1",
+  "source": {
+    "type": "json",
+    "config": {
+      "file_path": "samples/events.jsonl",
+      "format": "jsonl"
+    }
+  },
+  "transformations": [
+    {
+      "type": "filter",
+      "config": {
+        "condition": "status == 'active' AND score > 50"
+      }
+    },
+    {
+      "type": "map",
+      "config": {
+        "operations": {
+          "full_name": "CONCAT(first_name,last_name)",
+          "score_doubled": "MULTIPLY(score,2)"
+        }
+      }
+    }
+  ],
+  "destination": {
+    "type": "database",
+    "config": {
+      "table": "processed_events",
+      "mode": "upsert"
+    }
+  }
+}
+

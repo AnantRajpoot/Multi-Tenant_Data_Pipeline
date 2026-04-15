@@ -1,0 +1,34 @@
+{
+  "pipelineId": "pipeline_002",
+  "pipelineName": "Sales Aggregation Pipeline",
+  "tenantId": "tenant2",
+  "source": {
+    "type": "json",
+    "config": {
+      "file_path": "samples/sales_data.json",
+      "format": "array"
+    }
+  },
+  "transformations": [
+    {
+      "type": "aggregate",
+      "config": {
+        "group_by": ["region", "product"],
+        "aggregations": {
+          "total_sales": "SUM(amount)",
+          "avg_price": "AVG(price)",
+          "count": "COUNT(*)"
+        }
+      }
+    }
+  ],
+  "destination": {
+    "type": "file",
+    "config": {
+      "file_path": "./output/sales_summary.csv",
+      "format": "csv",
+      "compress": false
+    }
+  }
+}
+

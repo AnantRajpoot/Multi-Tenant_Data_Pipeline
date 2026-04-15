@@ -1,0 +1,39 @@
+{
+  "pipelineId": "pipeline_001",
+  "pipelineName": "Customer Data ETL - Filter and Transform",
+  "tenantId": "tenant1",
+  "source": {
+    "type": "csv",
+    "config": {
+      "file_path": "test.csv",
+      "delimiter": ",",
+      "has_header": true,
+      "encoding": "UTF-8"
+    }
+  },
+  "transformations": [
+    {
+      "type": "filter",
+      "config": {
+        "condition": "age > 25"
+      }
+    },
+    {
+      "type": "map",
+      "config": {
+        "operations": {
+          "name_upper": "UPPER(name)",
+          "age_category": "age"
+        }
+      }
+    }
+  ],
+  "destination": {
+    "type": "database",
+    "config": {
+      "table": "processed_customers",
+      "mode": "append"
+    }
+  }
+}
+
