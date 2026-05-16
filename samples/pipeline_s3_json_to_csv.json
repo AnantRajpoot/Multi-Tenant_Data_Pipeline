@@ -1,0 +1,31 @@
+{
+  "name": "S3 JSON to CSV Export",
+  "description": "Read JSON from S3, transform, export as CSV",
+  "source": {
+    "type": "s3",
+    "config": {
+      "endpoint": "https://s3.us-east-1.amazonaws.com",
+      "bucket": "analytics-data",
+      "key": "events/events.json",
+      "access_key": "${s3_prod_credentials}",
+      "secret_key": "${s3_prod_secret}",
+      "format": "json"
+    } 
+  },
+  "transformations": [
+    {
+      "type": "filter",
+      "config": {
+        "condition": "event_type == 'purchase' OR event_type == 'signup'"
+      }
+    }
+  ],
+  "destination": {
+    "type": "csv",
+    "config": {
+      "file_path": "./output/events_export.csv",
+      "include_header": true,
+      "delimiter": ","
+    }
+  }
+}

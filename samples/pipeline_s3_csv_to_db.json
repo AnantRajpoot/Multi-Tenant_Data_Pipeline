@@ -1,0 +1,49 @@
+{
+  "name": "S3 CSV to Database Pipeline",
+  "description": "Read CSV from S3, apply transformations, load to database",
+  "source": {
+    "type": "s3",
+    "config": {
+      "endpoint": "https://s3.us-east-1.amazonaws.com",
+      "bucket": "my-data-bucket",
+      "key": "sales/2025-02-01/data.csv",
+      "access_key": "${S3_ACCESS_KEY}",
+      "secret_key": "${S3_SECRET_KEY}",
+      "region": "us-east-1",
+      "format": "csv"
+    }
+  },
+  "transformations": [
+    {
+      "type": "filter",
+      "config": {
+        "condition": "amount > 0 AND status == 'completed'"
+      }
+    },
+    {
+      "type": "map",
+      "config": {
+        "mappings": {
+          "order_date": "date",
+          "customer_id": "customer",
+          "order_amount": "amount"
+        }
+      }
+    }
+  ],
+  "destination": {
+    "type": "database",
+    "config": {
+      "connection": {
+        "driver": "postgresql",
+        "host": "warehouse.example.com",
+        "port": 5432,
+        "database": "analytics",
+        "username": "etl_user",
+        "password": "${DB_PASSWORD}"
+      },
+      "table": "sales_transactions",
+      "mode": "replace"
+    }
+  }
+}

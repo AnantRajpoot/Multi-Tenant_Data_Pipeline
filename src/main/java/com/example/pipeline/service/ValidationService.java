@@ -4,6 +4,7 @@ import com.example.pipeline.model.JobRun;
 import com.example.pipeline.model.Pipeline;
 import com.example.pipeline.model.TransformationConfig;
 import com.example.pipeline.repository.PipelineRepository;
+import com.example.pipeline.util.EnvVarResolver;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -21,9 +22,9 @@ public class ValidationService {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    private static final List<String> SUPPORTED_SOURCE_TYPES = Arrays.asList("csv", "json");
+    private static final List<String> SUPPORTED_SOURCE_TYPES = Arrays.asList("csv", "json", "database", "api", "s3");
     private static final List<String> SUPPORTED_TRANSFORMATION_TYPES = Arrays.asList("filter", "map", "aggregate");
-    private static final List<String> SUPPORTED_DESTINATION_TYPES = Arrays.asList("database", "file");
+    private static final List<String> SUPPORTED_DESTINATION_TYPES = Arrays.asList("database", "file", "json");
 
     /**
      * Validates required pipeline fields, supported types, and destination accessibility.
@@ -51,14 +52,56 @@ public class ValidationService {
 
         // Validate source configuration
         Map<String, Object> sourceConfig = pipeline.getSource().getConfig();
-        if (sourceConfig == null || !sourceConfig.containsKey("file_path")) {
+        if (sourceConfig == null) {
             return false;
         }
+        
+        // Resolve environment variables in config for validation
+        Map<String, Object> resolvedConfig = EnvVarResolver.resolveMap(sourceConfig);
 
-        // Check if source file exists
-        String filePath = (String) sourceConfig.get("file_path");
-        if (filePath != null && !new File(filePath).exists()) {
-            System.err.println("Warning: Source file does not exist: " + filePath);
+        if ("csv".equalsIgnoreCase(sourceType) || "json".equalsIgnoreCase(sourceType)) {
+            if (!resolvedConfig.containsKey("file_path")) {
+                return false;
+            }
+            // Check if source file exists
+            String filePath = (String) resolvedConfig.get("file_path");
+            if (filePath != null && !new File(filePath).exists()) {
+                return false;
+            }
+        } else if ("database".equalsIgnoreCase(sourceType)) {
+            // For database, check for required query field
+            if (!resolvedConfig.containsKey("query")) {
+                return false;
+            }
+            
+            // Database handler requires a 'connection' object
+            if (resolvedConfig.containsKey("connection")) {
+                Map<String, Object> conn = (Map<String, Object>) resolvedConfig.get("connection");
+                if (conn == null) return false;
+                
+                // Connection requires either jdbc_url OR (driver, host, database)
+                if (!conn.containsKey("jdbc_url") || conn.get("jdbc_url").toString().isEmpty()) {
+                    if (!conn.containsKey("driver") || !conn.containsKey("host") || !conn.containsKey("database")) {
+                        return false;
+                    }
+                }
+            } else {
+                // Connection object is missing
+                return false;
+            }
+        } else if ("s3".equalsIgnoreCase(sourceType)) {
+            // S3 ingestion requires bucket and object key.
+            if (!resolvedConfig.containsKey("bucket") || !resolvedConfig.containsKey("key")) {
+                return false;
+            }
+            Object bucket = resolvedConfig.get("bucket");
+            Object key = resolvedConfig.get("key");
+            if (bucket == null || bucket.toString().trim().isEmpty()) {
+                return false;
+            }
+            if (key == null || key.toString().trim().isEmpty()) {
+                return false;
+            }
         }
 
         // Validate transformations
@@ -85,7 +128,7 @@ public class ValidationService {
         // Validate destination accessibility
         if ("database".equalsIgnoreCase(destType)) {
             return validateDatabaseDestination(pipeline.getDestination().getConfig());
-        } else if ("file".equalsIgnoreCase(destType)) {
+        } else if ("file".equalsIgnoreCase(destType) || "json".equalsIgnoreCase(destType)) {
             return validateFileDestination(pipeline.getDestination().getConfig());
         }
 
@@ -118,7 +161,15 @@ public class ValidationService {
             return true; // Will use default output directory
         }
 
-        String filePath = (String) config.get("file_path");
+        // Resolve environment variables in destination config
+        Map<String, Object> resolvedConfig = EnvVarResolver.resolveMap(config);
+        String filePath = null;
+        if (resolvedConfig.containsKey("file_path") && resolvedConfig.get("file_path") != null) {
+            filePath = resolvedConfig.get("file_path").toString();
+        } else if (resolvedConfig.containsKey("path") && resolvedConfig.get("path") != null) {
+            // Keep backward compatibility with sample payloads that use "path".
+            filePath = resolvedConfig.get("path").toString();
+        }
         if (filePath != null) {
             File file = new File(filePath);
             File parentDir = file.getParentFile();

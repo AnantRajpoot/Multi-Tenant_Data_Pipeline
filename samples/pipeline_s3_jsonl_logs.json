@@ -1,0 +1,49 @@
+{
+  "name": "S3 JSONL Logs Pipeline",
+  "description": "Read JSON Lines (JSONL) logs from S3, filter, and export",
+  "source": {
+    "type": "s3",
+    "config": {
+      "endpoint": "https://s3.us-west-2.amazonaws.com",
+      "bucket": "application-logs",
+      "key": "logs/2025-02-01.jsonl",
+      "access_key": "${S3_ACCESS_KEY}",
+      "secret_key": "${S3_SECRET_KEY}",
+      "region": "us-west-2",
+      "format": "jsonl"
+    }
+  },
+  "transformations": [
+    {
+      "type": "filter",
+      "config": {
+        "condition": "level == 'ERROR' OR level == 'WARN'"
+      }
+    },
+    {
+      "type": "map",
+      "config": {
+        "mappings": {
+          "timestamp": "log_time",
+          "message": "log_message",
+          "level": "severity"
+        }
+      }
+    }
+  ],
+  "destination": {
+    "type": "database",
+    "config": {
+      "connection": {
+        "driver": "postgresql",
+        "host": "logging-db.example.com",
+        "port": 5432,
+        "database": "logs",
+        "username": "log_collector",
+        "password": "${LOG_DB_PASSWORD}"
+      },
+      "table": "application_errors",
+      "mode": "insert"
+    }
+  }
+}

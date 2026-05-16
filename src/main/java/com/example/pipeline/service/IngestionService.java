@@ -14,9 +14,20 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
+import com.example.pipeline.service.source.SourceHandler;
+import jakarta.annotation.PostConstruct;
+import java.util.Locale;
+import java.util.stream.Collectors;
+
 
 @Service
 public class IngestionService {
+
+    @Autowired(required = false)
+    private List<SourceHandler> sourceHandlerList;
+
+    private Map<String, SourceHandler> sourceHandlerMap = new HashMap<>();
+
     @Autowired
     private TransformationService transformationService;
     @Autowired
@@ -35,13 +46,17 @@ public class IngestionService {
         String type = sourceConfig.getType();
 
         try {
-            if ("csv".equalsIgnoreCase(type)) {
+            if (type != null && sourceHandlerMap.containsKey(type.toLowerCase(Locale.ROOT))) {
+                SourceHandler handler = sourceHandlerMap.get(type.toLowerCase(Locale.ROOT));
+                handler.fetchRowsAndProcess(pipeline, row -> processRow(pipeline, row, metrics));
+            } else if ("csv".equalsIgnoreCase(type)) {
                 ingestCSV(pipeline, metrics);
             } else if ("json".equalsIgnoreCase(type)) {
                 ingestJSON(pipeline, metrics);
             } else {
                 throw new IllegalArgumentException("Unsupported source type: " + type);
             }
+
             metrics.endTime = new Date();
             metrics.success = true;
         } catch (Exception e) {
@@ -341,4 +356,14 @@ public class IngestionService {
             return 0;
         }
     }
+
+    // init method
+    @PostConstruct
+    private void initSourceHandlers() {
+        if (sourceHandlerList != null) {
+            sourceHandlerMap = sourceHandlerList.stream()
+                    .collect(Collectors.toMap(h -> h.getType().toLowerCase(Locale.ROOT), h -> h));
+        }
+    }
+
 }

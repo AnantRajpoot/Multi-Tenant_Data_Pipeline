@@ -1,6 +1,8 @@
 package com.example.pipeline.service;
 
 import com.example.pipeline.model.TransformationConfig;
+import com.example.pipeline.service.transformation.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -12,9 +14,38 @@ import java.util.stream.Collectors;
 public class TransformationService {
     // Buffers rows when an aggregate stage is configured.
     private List<Map<String, Object>> aggregateBuffer = new ArrayList<>();
+    
+    // Pluggable transformation handlers (Phase 2 - Option B)
+    @Autowired(required = false)
+    private SortTransformationHandler sortHandler;
+    
+    @Autowired(required = false)
+    private DeduplicateTransformationHandler deduplicateHandler;
+    
+    @Autowired(required = false)
+    private JoinTransformationHandler joinHandler;
+    
+    @Autowired(required = false)
+    private PivotTransformationHandler pivotHandler;
+    
+    @Autowired(required = false)
+    private ValidationTransformationHandler validationHandler;
+    
+    private Map<String, TransformationHandler> handlerRegistry;
+    
+    @Autowired
+    public void initializeHandlers() {
+        handlerRegistry = new HashMap<>();
+        if (sortHandler != null) handlerRegistry.put("sort", sortHandler);
+        if (deduplicateHandler != null) handlerRegistry.put("deduplicate", deduplicateHandler);
+        if (joinHandler != null) handlerRegistry.put("join", joinHandler);
+        if (pivotHandler != null) handlerRegistry.put("pivot", pivotHandler);
+        if (validationHandler != null) handlerRegistry.put("validation", validationHandler);
+    }
 
     /**
      * Applies transformation stages in order; returns null when a row is filtered or buffered for aggregate.
+     * Supports both Phase 1 (filter, map, aggregate) and Phase 2 (sort, deduplicate, join, pivot, validation) transformations.
      */
     public Map<String, Object> applyTransformations(Map<String, Object> data,
             List<TransformationConfig> configs, IngestionService.IngestionMetrics metrics) {
@@ -28,21 +59,40 @@ public class TransformationService {
             String type = config.getType().toLowerCase();
             Map<String, Object> params = config.getConfig();
 
-            switch (type) {
-                case "filter":
-                    if (!applyFilter(currentData, params)) {
-                        return null; // Row filtered out
-                    }
-                    break;
-                case "map":
-                    currentData = applyMap(currentData, params);
-                    break;
-                case "aggregate":
-                    // Aggregate is handled differently - buffer rows
+            // Check if this is a Phase 2 transformation handler
+            if (handlerRegistry != null && handlerRegistry.containsKey(type)) {
+                TransformationHandler handler = handlerRegistry.get(type);
+                
+                // Handlers that require batch processing are handled differently
+                if (handler.requiresBatchProcessing()) {
+                    // Buffer for batch processing
                     aggregateBuffer.add(new HashMap<>(currentData));
                     return null; // Don't process individual rows
-                default:
-                    throw new IllegalArgumentException("Unsupported transformation: " + type);
+                } else {
+                    // Row-level handler (e.g., validation)
+                    currentData = handler.transformRow(currentData, params, metrics);
+                    if (currentData == null) {
+                        return null; // Row filtered out
+                    }
+                }
+            } else {
+                // Phase 1 transformations (filter, map, aggregate)
+                switch (type) {
+                    case "filter":
+                        if (!applyFilter(currentData, params)) {
+                            return null; // Row filtered out
+                        }
+                        break;
+                    case "map":
+                        currentData = applyMap(currentData, params);
+                        break;
+                    case "aggregate":
+                        // Aggregate is handled differently - buffer rows
+                        aggregateBuffer.add(new HashMap<>(currentData));
+                        return null; // Don't process individual rows
+                    default:
+                        throw new IllegalArgumentException("Unsupported transformation: " + type);
+                }
             }
         }
 
@@ -51,19 +101,39 @@ public class TransformationService {
 
     /**
      * Produces final aggregate rows from the buffered input rows.
+     * Handles both Phase 1 (aggregate) and Phase 2 (sort, deduplicate, join, pivot) batch transformations.
      */
     public List<Map<String, Object>> finalizeAggregations(List<TransformationConfig> configs) {
         if (configs == null || aggregateBuffer.isEmpty()) {
             return Collections.emptyList();
         }
 
+        List<Map<String, Object>> results = new ArrayList<>(aggregateBuffer);
+        
+        // Initialize handler registry if needed
+        if (handlerRegistry == null) {
+            initializeHandlers();
+        }
+        
+        IngestionService.IngestionMetrics metrics = new IngestionService.IngestionMetrics();
+
         for (TransformationConfig config : configs) {
-            if ("aggregate".equalsIgnoreCase(config.getType())) {
-                return applyAggregate(aggregateBuffer, config.getConfig());
+            String type = config.getType().toLowerCase();
+            Map<String, Object> params = config.getConfig();
+            
+            // Check if this is a Phase 2 batch transformation handler
+            if (handlerRegistry != null && handlerRegistry.containsKey(type)) {
+                TransformationHandler handler = handlerRegistry.get(type);
+                if (handler.requiresBatchProcessing()) {
+                    results = handler.transformBatch(results, params, metrics);
+                }
+            } else if ("aggregate".equalsIgnoreCase(type)) {
+                // Phase 1 aggregate
+                results = applyAggregate(results, params);
             }
         }
 
-        return Collections.emptyList();
+        return results;
     }
 
     /**

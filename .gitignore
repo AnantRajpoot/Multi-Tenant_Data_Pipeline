@@ -1,2 +1,4 @@
 # Project exclude paths
 /target/
+# Documentation folder (phase docs, examples)
+docs/

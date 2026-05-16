@@ -1,0 +1,39 @@
+{
+  "name": "S3 Prefix Read - Daily Files",
+  "description": "Read all CSV files from a daily folder in S3",
+  "source": {
+    "type": "s3",
+    "config": {
+      "endpoint": "https://s3.us-east-1.amazonaws.com",
+      "bucket": "data-warehouse",
+      "key": "daily-exports/2025-02-01/",
+      "access_key": "${AWS_ACCESS_KEY_ID}",
+      "secret_key": "${AWS_SECRET_ACCESS_KEY}",
+      "region": "us-east-1",
+      "format": "csv"
+    }
+  },
+  "transformations": [
+    {
+      "type": "filter",
+      "config": {
+        "condition": "status != 'pending'"
+      }
+    }
+  ],
+  "destination": {
+    "type": "database",
+    "config": {
+      "connection": {
+        "driver": "postgresql",
+        "host": "db.example.com",
+        "port": 5432,
+        "database": "data_lake",
+        "username": "pipeline_user",
+        "password": "${PG_PASSWORD}"
+      },
+      "table": "daily_exports",
+      "mode": "insert"
+    }
+  }
+}

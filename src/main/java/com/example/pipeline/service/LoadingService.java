@@ -37,7 +37,7 @@ public class LoadingService {
 
         if ("database".equalsIgnoreCase(type)) {
             loadToDatabase(data, destination);
-        } else if ("file".equalsIgnoreCase(type)) {
+        } else if ("file".equalsIgnoreCase(type) || "json".equalsIgnoreCase(type)) {
             loadToFile(data, destination);
         } else {
             System.out.println("Final Output: " + data);
@@ -52,7 +52,7 @@ public class LoadingService {
 
         if ("database".equalsIgnoreCase(type)) {
             batchInsertToDatabase(dataList, destination);
-        } else if ("file".equalsIgnoreCase(type)) {
+        } else if ("file".equalsIgnoreCase(type) || "json".equalsIgnoreCase(type)) {
             batchWriteToFile(dataList, destination);
         }
     }
@@ -152,8 +152,13 @@ public class LoadingService {
      */
     private void batchWriteToFile(List<Map<String, Object>> dataList, DestinationConfig destination) {
         Map<String, Object> config = destination.getConfig();
-        String format = (String) config.getOrDefault("format", "csv");
+        String destType = destination.getType();
+        String defaultFormat = "json".equalsIgnoreCase(destType) ? "json" : "csv";
+        String format = (String) config.getOrDefault("format", defaultFormat);
         String filePath = (String) config.get("file_path");
+        if (filePath == null) {
+            filePath = (String) config.get("path");
+        }
         boolean compress = (boolean) config.getOrDefault("compress", false);
 
         if (filePath == null) {
@@ -162,7 +167,10 @@ public class LoadingService {
 
         try {
             // Create output directory if needed
-            Files.createDirectories(Paths.get(filePath).getParent());
+            java.nio.file.Path parent = Paths.get(filePath).getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
 
             if ("csv".equalsIgnoreCase(format)) {
                 writeToCSV(dataList, filePath, compress);
